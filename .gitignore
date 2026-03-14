@@ -6,3 +6,5 @@
 
 # Ignorar las variables de entorno reales
 .env
+assets/miniatura.png
+src_modulo/codigopostal.zip
