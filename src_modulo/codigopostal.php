@@ -110,11 +110,48 @@ class CodigoPostal extends Module
 
     // --- FIN FASE 3 ---
 
-    // El hook de prueba que teníamos de la Fase 2
+    // --- FASE 4: LÓGICA FRONTOFFICE ---
+
     public function hookDisplayPaymentTop($params)
     {
-        return '<div class="alert alert-warning" style="border: 2px solid red; font-weight: bold; margin-bottom: 20px;">
-                    ¡Hola mundo!
-                </div>';
+        // 1. Obtenemos los códigos permitidos que guardaste en el Backoffice
+        $codigos_guardados = Configuration::get('CODIGOPOSTAL_PERMITIDOS');
+        
+        // Si el administrador no ha escrito nada aún, no bloqueamos la tienda
+        if (empty($codigos_guardados)) {
+            return ''; 
+        }
+
+        // Convertimos tu texto "18001, 18002" en una lista (array) limpia sin espacios
+        $codigos_permitidos = array_map('trim', explode(',', $codigos_guardados));
+
+        // 2. Cargamos el carrito actual del cliente
+        $cart = $this->context->cart;
+        
+        // Si por algún casual llega aquí sin dirección, no hacemos nada
+        if (!$cart->id_address_delivery) {
+            return ''; 
+        }
+
+        // 3. Cargamos la dirección completa y sacamos el Código Postal
+        $address = new Address($cart->id_address_delivery);
+        $codigo_cliente = trim($address->postcode);
+
+        // 4. LA MAGIA: Comparamos el código del cliente con tu lista de permitidos
+        if (in_array($codigo_cliente, $codigos_permitidos)) {
+            // ¡Todo en orden! Está en la lista. No devolvemos ningún error.
+            return ''; 
+        }
+
+        // 5. Si NO está en la lista: Mostramos error y OCULTAMOS los métodos de pago
+        $css_bloqueo = '<style>.payment-options, .conditions-to-approve { display: none !important; }</style>';
+        
+        $mensaje_error = '<div class="alert alert-danger" style="border: 2px solid #dc3545; margin-bottom: 20px;">
+                            <h4 style="color: #dc3545; font-weight: bold;">' . $this->l('Envío no disponible') . '</h4>
+                            <p>' . $this->l('Actualmente no realizamos envíos al código postal: ') . '<b>' . $codigo_cliente . '</b>.</p>
+                            <p>' . $this->l('Por favor, modifica tu dirección de envío en el paso anterior para poder finalizar la compra.') . '</p>
+                          </div>';
+
+        return $css_bloqueo . $mensaje_error;
     }
 }
