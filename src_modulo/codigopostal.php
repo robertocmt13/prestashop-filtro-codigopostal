@@ -9,7 +9,7 @@ class CodigoPostal extends Module
     {
         $this->name = 'codigopostal';
         $this->tab = 'shipping_logistics';
-        $this->version = '1.1.0';
+        $this->version = '1.2.0'; // ¡Versión definitiva!
         $this->author = 'Roberto Carlos Moyano';
         $this->need_instance = 0;
         $this->ps_versions_compliancy = [
@@ -21,35 +21,32 @@ class CodigoPostal extends Module
         parent::__construct();
 
         $this->displayName = $this->l('Filtro Avanzado de Código Postal');
-        $this->description = $this->l('Bloquea o permite compras basándose en el código postal del cliente.');
+        $this->description = $this->l('Bloquea o permite compras basándose en el código postal del cliente (soporta prefijos).');
         $this->confirmUninstall = $this->l('¿Estás seguro de que quieres desinstalar el módulo?');
     }
 
     public function install()
     {
-        // Añadimos las DOS variables de configuración
         return parent::install() &&
             $this->registerHook('displayPaymentTop') &&
-            Configuration::updateValue('CODIGOPOSTAL_MODO', 1) && // 1 = Permitidos, 0 = Bloqueados
+            Configuration::updateValue('CODIGOPOSTAL_MODO', 1) &&
             Configuration::updateValue('CODIGOPOSTAL_LISTA', '');
     }
 
     public function uninstall()
     {
-        // Limpiamos la basura de la base de datos
         return Configuration::deleteByName('CODIGOPOSTAL_MODO') &&
             Configuration::deleteByName('CODIGOPOSTAL_LISTA') &&
             parent::uninstall();
     }
 
-    // --- FASE 3: BACKOFFICE ---
+    // --- BACKOFFICE ---
 
     public function getContent()
     {
         $output = '';
 
         if (Tools::isSubmit('submitCodigoPostal')) {
-            // Recogemos el interruptor (1 o 0) y el texto
             $modo = (int)Tools::getValue('CODIGOPOSTAL_MODO');
             $lista = Tools::getValue('CODIGOPOSTAL_LISTA');
             
@@ -78,7 +75,6 @@ class CodigoPostal extends Module
             . '&configure=' . $this->name . '&tab_module=' . $this->tab . '&module_name=' . $this->name;
         $helper->token = Tools::getAdminTokenLite('AdminModules');
 
-        // Cargamos los valores guardados
         $helper->fields_value['CODIGOPOSTAL_MODO'] = Configuration::get('CODIGOPOSTAL_MODO');
         $helper->fields_value['CODIGOPOSTAL_LISTA'] = Configuration::get('CODIGOPOSTAL_LISTA');
 
@@ -90,7 +86,7 @@ class CodigoPostal extends Module
                 ],
                 'input' => [
                     [
-                        'type' => 'radio', // Aquí está el interruptor mágico
+                        'type' => 'radio',
                         'label' => $this->l('Modo de funcionamiento'),
                         'name' => 'CODIGOPOSTAL_MODO',
                         'is_bool' => false,
@@ -111,7 +107,8 @@ class CodigoPostal extends Module
                         'type' => 'text',
                         'label' => $this->l('Códigos Postales'),
                         'name' => 'CODIGOPOSTAL_LISTA',
-                        'desc' => $this->l('Escribe los códigos postales separados por comas (ejemplo: 35000, 38000, 51000).')
+                        // Texto actualizado para educar al usuario
+                        'desc' => $this->l('Separados por comas. Puedes usar prefijos (ej: "35" aplicará a todos los que empiecen por 35) o códigos completos (ej: "28001" para uno específico).')
                     ],
                 ],
                 'submit' => [
@@ -124,7 +121,7 @@ class CodigoPostal extends Module
         return $helper->generateForm([$form]);
     }
 
-    // --- FASE 4: LÓGICA FRONTOFFICE (CEREBRO ACTUALIZADO) ---
+    // --- FRONTOFFICE (LÓGICA CON PREFIJOS) ---
 
     public function hookDisplayPaymentTop($params)
     {
@@ -145,24 +142,28 @@ class CodigoPostal extends Module
         $address = new Address($cart->id_address_delivery);
         $codigo_cliente = trim($address->postcode);
 
-        // Miramos si el cliente está en la lista escrita
-        $esta_en_lista = in_array($codigo_cliente, $codigos_array);
+        // Búsqueda inteligente por prefijo o coincidencia exacta
+        $esta_en_lista = false;
+        foreach ($codigos_array as $codigo_guardado) {
+            // El !== '' evita errores si el usuario deja una coma suelta al final
+            if ($codigo_guardado !== '' && strpos($codigo_cliente, $codigo_guardado) === 0) {
+                $esta_en_lista = true;
+                break;
+            }
+        }
+
         $bloquear = false;
 
-        // LA DECISIÓN LÓGICA
         if ($modo === 1 && !$esta_en_lista) {
-            // MODO LISTA BLANCA: Bloqueamos si NO está en la lista
             $bloquear = true;
         } elseif ($modo === 0 && $esta_en_lista) {
-            // MODO LISTA NEGRA: Bloqueamos si SÍ está en la lista
             $bloquear = true;
         }
 
         if (!$bloquear) {
-            return ''; // Vía libre, puede pagar
+            return ''; 
         }
 
-        // Si ha caído en la trampa, bloqueamos el pago
         $css_bloqueo = '<style>.payment-options, .conditions-to-approve { display: none !important; }</style>';
         $mensaje_error = '<div class="alert alert-danger" style="border: 2px solid #dc3545; margin-bottom: 20px;">
                             <h4 style="color: #dc3545; font-weight: bold;">' . $this->l('Envío no disponible') . '</h4>
