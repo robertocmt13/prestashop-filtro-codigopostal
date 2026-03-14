@@ -30,7 +30,7 @@ services:
     volumes:
       - ./ps_data:/var/www/html
       # Mapeo quirúrgico: Descomenta esta línea cuando crees el módulo
-      - ./src_modulo:/var/www/html/modules/codigopostal
+      - ./src_modulo/codigopostal:/var/www/html/modules/codigopostal
     depends_on:
       - mariadb
     restart: always
