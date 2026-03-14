@@ -1,0 +1,8 @@
+# Ignorar los datos de la base de datos MariaDB
+/db_data/
+
+# Ignorar todo el core y los archivos de PrestaShop
+/ps_data/
+
+# Ignorar las variables de entorno reales
+.env

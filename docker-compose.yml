@@ -1,0 +1,36 @@
+
+services:
+  mariadb:
+    image: mariadb:10.5
+    container_name: ps_db_${PROJECT_NAME:-template}
+    environment:
+      - MYSQL_ROOT_PASSWORD=admin
+      - MYSQL_DATABASE=prestashop
+      - MYSQL_USER=prestashop
+      - MYSQL_PASSWORD=prestashop
+    volumes:
+      - ./db_data:/var/lib/mysql
+    restart: always
+
+  prestashop:
+    image: prestashop/prestashop:8.1-apache
+    container_name: ps_web_${PROJECT_NAME:-template}
+    ports:
+      - "${PS_PORT:-8080}:80"
+    environment:
+      - DB_SERVER=mariadb
+      - DB_USER=prestashop
+      - DB_PASSWD=prestashop
+      - DB_NAME=prestashop
+      - PS_DOMAIN=localhost:${PS_PORT:-8080}
+      - PS_INSTALL_AUTO=1
+      - PS_LANGUAGE=es
+      - PS_COUNTRY=ES
+      - PS_FOLDER_ADMIN=admin_dev
+    volumes:
+      - ./ps_data:/var/www/html
+      # Mapeo quirúrgico: Descomenta esta línea cuando crees el módulo
+      - ./src_modulo:/var/www/html/modules/codigopostal
+    depends_on:
+      - mariadb
+    restart: always
